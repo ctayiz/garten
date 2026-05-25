@@ -4,24 +4,28 @@ declare global {
   var __gardenPool: Pool | undefined;
 }
 
-const connectionString = process.env.DATABASE_URL;
+export function getPool() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error("DATABASE_URL is not set");
+  }
 
-if (!connectionString) {
-  throw new Error("DATABASE_URL is not set");
-}
+  const pool =
+    global.__gardenPool ??
+    new Pool({
+      connectionString,
+      ssl: { rejectUnauthorized: false },
+    });
 
-export const pool =
-  global.__gardenPool ??
-  new Pool({
-    connectionString,
-    ssl: { rejectUnauthorized: false },
-  });
+  if (process.env.NODE_ENV !== "production") {
+    global.__gardenPool = pool;
+  }
 
-if (process.env.NODE_ENV !== "production") {
-  global.__gardenPool = pool;
+  return pool;
 }
 
 export async function ensureSchema() {
+  const pool = getPool();
   await pool.query(`
     CREATE TABLE IF NOT EXISTS garden_state (
       id INTEGER PRIMARY KEY,
