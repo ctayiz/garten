@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 type MainBedEntry = {
@@ -76,6 +76,12 @@ const slotLabel = (key: BedKey) => {
 const isHighBed = (key: BedKey): key is "hochbeet-1" | "hochbeet-2" => key.startsWith("hochbeet");
 
 export default function Home() {
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+
   const [mainBeds, setMainBeds] = useState<Record<BedKey, MainBedEntry>>(createInitialMainBeds);
   const [highBeds, setHighBeds] = useState<Record<BedKey, HighBedEntry>>(createInitialHighBeds);
   const [selectedKey, setSelectedKey] = useState<BedKey>("beet-1");
@@ -345,6 +351,10 @@ export default function Home() {
     if (isHighBed(selectedKey)) setHighBeds((prev) => ({ ...prev, [selectedKey]: { ...emptyHighEntry } }));
     else setMainBeds((prev) => ({ ...prev, [selectedKey]: { ...emptyMainEntry } }));
   };
+
+  if (!isClient) {
+    return <main className="garden-bg min-h-screen" />;
+  }
 
   const unlockWithPin = async () => {
     try {
