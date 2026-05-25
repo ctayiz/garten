@@ -291,10 +291,10 @@ export default function Home() {
 
         <section className="surface rounded-3xl p-4 sm:p-5">
           <p className="mb-3 text-xs font-bold tracking-[0.18em] text-zinc-500 uppercase">Hintere Reihe (an der Mauer) · 8 Felder</p>
-          <BeetRow keysRow={row1} mainBeds={mainBeds} openModal={openModal} />
+          <BeetRow keysRow={row1} mainBeds={mainBeds} openModal={openModal} setZoomImage={setZoomImage} />
           <div className="h-3" />
           <p className="mb-3 mt-1 text-xs font-bold tracking-[0.18em] text-zinc-500 uppercase">Vordere Reihe (am Weg) · 7 Felder</p>
-          <BeetRow keysRow={row2} mainBeds={mainBeds} openModal={openModal} />
+          <BeetRow keysRow={row2} mainBeds={mainBeds} openModal={openModal} setZoomImage={setZoomImage} />
         </section>
 
         <section className="surface rounded-3xl p-4 sm:p-5">
@@ -303,13 +303,20 @@ export default function Home() {
             {highBedKeys.map((key, i) => {
               const item = highBeds[key];
               return (
-                <button key={key} onClick={() => openModal(key)} className="highbed-card text-left">
-                  <div className="mb-3 h-44 overflow-hidden rounded-xl border border-emerald-900/10 bg-emerald-50">
+                <div key={key} className="highbed-card text-left">
+                  <button
+                    type="button"
+                    onClick={() => item.photo && setZoomImage({ src: item.photo, label: `Hochbeet ${i + 1} · Gesamtbild` })}
+                    className="mb-3 block h-44 w-full overflow-hidden rounded-xl border border-emerald-900/10 bg-emerald-50"
+                  >
                     {item.photo ? <img src={item.photo} alt={`Hochbeet ${i + 1}`} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-sm text-zinc-400">Kein Gesamtbild</div>}
-                  </div>
+                  </button>
                   <h3 className="text-xl font-extrabold text-emerald-950">Hochbeet {i + 1}</h3>
                   <p className="mt-1 text-sm text-zinc-600">Pflanzen: {item.plants.length}</p>
-                </button>
+                  <button onClick={() => openModal(key)} className="btn-primary mt-3 w-full py-2 text-sm">
+                    {item.photo || item.plants.length > 0 ? "Bearbeiten" : "Hinzufügen"}
+                  </button>
+                </div>
               );
             })}
           </div>
@@ -398,27 +405,51 @@ export default function Home() {
   );
 }
 
-function BeetRow({ keysRow, mainBeds, openModal }: { keysRow: BedKey[]; mainBeds: Record<BedKey, MainBedEntry>; openModal: (k: BedKey) => void }) {
+function BeetRow({
+  keysRow,
+  mainBeds,
+  openModal,
+  setZoomImage,
+}: {
+  keysRow: BedKey[];
+  mainBeds: Record<BedKey, MainBedEntry>;
+  openModal: (k: BedKey) => void;
+  setZoomImage: (value: { src: string; label: string } | null) => void;
+}) {
   return (
     <div className="pb-2">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
         {keysRow.map((key) => {
           const item = mainBeds[key];
+          const hasData = Boolean(item.crop.trim() || item.variety.trim() || item.notes.trim() || item.infoUrl.trim() || item.currentPhoto || item.finalPhoto);
           return (
-            <button key={key} onClick={() => openModal(key)} className="bed-card w-full">
+            <div key={key} className="bed-card w-full">
               <div className="mb-1 text-[11px] font-bold tracking-wide text-zinc-500 uppercase">{slotLabel(key)}</div>
-              <div className="mb-2 overflow-hidden rounded-xl border border-emerald-900/10 bg-emerald-50">
+              <button
+                type="button"
+                onClick={() =>
+                  setZoomImage({
+                    src: item.currentPhoto || item.finalPhoto || "",
+                    label: `${slotLabel(key)} · ${item.currentPhoto ? "Aktuell" : "Endstadium"}`,
+                  })
+                }
+                disabled={!item.currentPhoto && !item.finalPhoto}
+                className="mb-2 block w-full overflow-hidden rounded-xl border border-emerald-900/10 bg-emerald-50 disabled:cursor-not-allowed"
+              >
                 <div className="h-20 border-b border-emerald-900/10 bg-emerald-50">
                   {item.currentPhoto ? <img src={item.currentPhoto} alt={`${item.crop || slotLabel(key)} aktuell`} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-xs text-zinc-400">Aktuell</div>}
                 </div>
                 <div className="h-20 bg-emerald-50">
                   {item.finalPhoto ? <img src={item.finalPhoto} alt={`${item.crop || slotLabel(key)} endstadium`} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-xs text-zinc-400">Endstadium</div>}
                 </div>
-              </div>
+              </button>
               <div className="line-clamp-1 text-base font-bold text-emerald-950">{item.crop || "Noch frei"}</div>
               <div className="mt-1 line-clamp-2 min-h-10 text-sm text-zinc-500">{item.variety || "Keine Sorte"}</div>
               {item.infoUrl ? <div className="mt-1 text-[11px] font-semibold text-emerald-700">Link hinterlegt</div> : null}
-            </button>
+              <button onClick={() => openModal(key)} className="btn-primary mt-3 w-full py-2 text-sm">
+                {hasData ? "Bearbeiten" : "Hinzufügen"}
+              </button>
+            </div>
           );
         })}
       </div>
