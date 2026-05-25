@@ -6,11 +6,21 @@ import { AnimatePresence, motion } from "framer-motion";
 type MainBedEntry = {
   crop: string;
   variety: string;
+  plantedAt: string;
   notes: string;
   infoUrl: string;
   currentPhoto: string;
   finalPhoto: string;
+  reminders: ReminderItem[];
   updatedAt: string;
+};
+
+type ReminderType = "gießen" | "düngen" | "ausgeizen" | "ernten";
+type ReminderItem = {
+  id: string;
+  type: ReminderType;
+  dueDate: string;
+  done: boolean;
 };
 
 type HighBedPlant = {
@@ -38,10 +48,12 @@ const highBedKeys: BedKey[] = ["hochbeet-1", "hochbeet-2"];
 const emptyMainEntry: MainBedEntry = {
   crop: "",
   variety: "",
+  plantedAt: "",
   notes: "",
   infoUrl: "",
   currentPhoto: "",
   finalPhoto: "",
+  reminders: [],
   updatedAt: "",
 };
 
@@ -199,10 +211,11 @@ export default function Home() {
     const mainValues = Object.values(mainBeds);
     const mainPlanted = mainValues.filter((v) => v.crop.trim()).length;
     const highPlantCount = highBedKeys.reduce((sum, key) => sum + highBeds[key].plants.length, 0);
+    const openReminders = mainValues.reduce((sum, entry) => sum + entry.reminders.filter((r) => !r.done).length, 0);
     const withPhoto =
       mainValues.filter((v) => v.currentPhoto || v.finalPhoto).length +
       highBedKeys.reduce((sum, key) => sum + highBeds[key].plants.filter((p) => p.currentPhoto || p.finalPhoto).length, 0);
-    return { planted: mainPlanted + highPlantCount, withPhoto, mainPlanted, highPlantCount };
+    return { planted: mainPlanted + highPlantCount, withPhoto, mainPlanted, highPlantCount, openReminders };
   }, [mainBeds, highBeds]);
 
   const selectedMain = !isHighBed(selectedKey) ? mainBeds[selectedKey] : null;
@@ -218,6 +231,49 @@ export default function Home() {
   const updateMainEntry = (patch: Partial<MainBedEntry>) => {
     if (isHighBed(selectedKey)) return;
     setMainBeds((prev) => ({ ...prev, [selectedKey]: { ...prev[selectedKey], ...patch, updatedAt: new Date().toLocaleDateString("de-DE") } }));
+    setSavedHint(true);
+  };
+
+  const addReminder = (type: ReminderType) => {
+    if (isHighBed(selectedKey)) return;
+    const today = new Date().toISOString().slice(0, 10);
+    setMainBeds((prev) => ({
+      ...prev,
+      [selectedKey]: {
+        ...prev[selectedKey],
+        reminders: [
+          ...prev[selectedKey].reminders,
+          { id: crypto.randomUUID(), type, dueDate: today, done: false },
+        ],
+        updatedAt: new Date().toLocaleDateString("de-DE"),
+      },
+    }));
+    setSavedHint(true);
+  };
+
+  const updateReminder = (id: string, patch: Partial<ReminderItem>) => {
+    if (isHighBed(selectedKey)) return;
+    setMainBeds((prev) => ({
+      ...prev,
+      [selectedKey]: {
+        ...prev[selectedKey],
+        reminders: prev[selectedKey].reminders.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+        updatedAt: new Date().toLocaleDateString("de-DE"),
+      },
+    }));
+    setSavedHint(true);
+  };
+
+  const removeReminder = (id: string) => {
+    if (isHighBed(selectedKey)) return;
+    setMainBeds((prev) => ({
+      ...prev,
+      [selectedKey]: {
+        ...prev[selectedKey],
+        reminders: prev[selectedKey].reminders.filter((r) => r.id !== id),
+        updatedAt: new Date().toLocaleDateString("de-DE"),
+      },
+    }));
     setSavedHint(true);
   };
 
@@ -282,7 +338,7 @@ export default function Home() {
             <Stat label="Gesamt Pflanzen" value={stats.planted} />
             <Stat label="Mit Bild" value={stats.withPhoto} />
             <Stat label="Hauptbeet" value={`${stats.mainPlanted}/15`} />
-            <Stat label="Hochbeete Pflanzen" value={stats.highPlantCount} />
+            <Stat label="Offene Erinnerungen" value={stats.openReminders} />
           </div>
           <div className="mt-4 rounded-2xl border border-emerald-900/10 bg-white/60 px-4 py-3 text-sm text-emerald-900/80">
             Real-Mapping: obere Reihe = hinten an der Mauer (8 Felder), untere Reihe = vorne am Weg (7 Felder).
@@ -340,6 +396,7 @@ export default function Home() {
                 <div className="space-y-3">
                   <Field label="Gemüse"><input ref={firstInputRef} className="field" value={selectedMain.crop} onChange={(e) => updateMainEntry({ crop: e.target.value })} /></Field>
                   <Field label="Sorte"><input className="field" value={selectedMain.variety} onChange={(e) => updateMainEntry({ variety: e.target.value })} /></Field>
+                  <Field label="Wann eingepflanzt"><input type="date" className="field" value={selectedMain.plantedAt} onChange={(e) => updateMainEntry({ plantedAt: e.target.value })} /></Field>
                   <Field label="Link (Infos) "><input className="field" value={selectedMain.infoUrl} onChange={(e) => updateMainEntry({ infoUrl: e.target.value })} placeholder="https://..." /></Field>
                   <Field label="Notizen"><textarea className="field min-h-24" value={selectedMain.notes} onChange={(e) => updateMainEntry({ notes: e.target.value })} /></Field>
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -347,6 +404,30 @@ export default function Home() {
                     <Field label="Endstadium Bild"><input type="file" accept="image/*" onChange={(e) => handleMainPhoto("finalPhoto", e)} className="upload" />{selectedMain.finalPhoto ? <img src={selectedMain.finalPhoto} alt="Endstadium" className="mt-2 h-20 w-20 cursor-zoom-in rounded-lg object-cover" onClick={() => setZoomImage({ src: selectedMain.finalPhoto, label: "Endstadium Bild" })} /> : null}</Field>
                   </div>
                   <div className="pt-2"><button onClick={clearCurrent} className="btn-ghost">Feld leeren</button></div>
+
+                  <div className="mt-3 rounded-2xl border border-emerald-900/10 bg-emerald-50/70 p-3">
+                    <p className="text-xs font-bold tracking-wide text-zinc-600 uppercase">Pflanzenkalender</p>
+                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <button onClick={() => addReminder("gießen")} className="btn-ghost text-xs">+ Gießen</button>
+                      <button onClick={() => addReminder("düngen")} className="btn-ghost text-xs">+ Düngen</button>
+                      <button onClick={() => addReminder("ausgeizen")} className="btn-ghost text-xs">+ Ausgeizen</button>
+                      <button onClick={() => addReminder("ernten")} className="btn-ghost text-xs">+ Ernten</button>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {selectedMain.reminders.length === 0 ? (
+                        <p className="text-xs text-zinc-500">Noch keine Erinnerungen hinterlegt.</p>
+                      ) : (
+                        selectedMain.reminders.map((r) => (
+                          <div key={r.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-900/10 bg-white/70 p-2">
+                            <input type="checkbox" checked={r.done} onChange={(e) => updateReminder(r.id, { done: e.target.checked })} />
+                            <span className={`text-sm font-semibold ${r.done ? "text-zinc-400 line-through" : "text-emerald-900"}`}>{r.type}</span>
+                            <input type="date" className="field max-w-[170px] !py-1.5" value={r.dueDate} onChange={(e) => updateReminder(r.id, { dueDate: e.target.value })} />
+                            <button onClick={() => removeReminder(r.id)} className="btn-ghost text-xs">Löschen</button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </div>
               ) : selectedHigh ? (
                 <div className="space-y-4">
