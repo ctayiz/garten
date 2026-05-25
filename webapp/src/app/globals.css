@@ -1,0 +1,142 @@
+@import "tailwindcss";
+
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+html, body { overflow-x: hidden; }
+body { font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif; color: #1c2a20; }
+
+.garden-bg {
+  background:
+    radial-gradient(circle at 8% 10%, rgba(153, 196, 142, 0.18), transparent 30%),
+    radial-gradient(circle at 90% 12%, rgba(224, 202, 157, 0.16), transparent 34%),
+    linear-gradient(180deg, #f2f6ec 0%, #edf3e7 45%, #f8f4ea 100%);
+}
+
+.mode-editorial .hero-card {
+  background: linear-gradient(145deg, #e8f1e2 0%, #dcead3 52%, #d2e3c6 100%);
+}
+
+.mode-dashboard .hero-card {
+  background: linear-gradient(145deg, #d8ead0 0%, #cde3c1 52%, #c4dcba 100%);
+  border-color: rgba(24, 73, 41, 0.24);
+}
+
+.hero-card {
+  border: 1px solid rgba(43, 84, 54, 0.16);
+  box-shadow: 0 10px 28px rgba(38, 62, 44, 0.08);
+}
+
+.surface {
+  background: rgba(255, 253, 246, 0.9);
+  border: 1px solid rgba(52, 90, 60, 0.14);
+  box-shadow: 0 8px 24px rgba(35, 58, 41, 0.06);
+}
+
+.mode-dashboard .surface {
+  background: rgba(247, 252, 244, 0.94);
+  border-color: rgba(39, 86, 55, 0.2);
+  box-shadow: 0 10px 30px rgba(29, 62, 39, 0.1);
+}
+
+.mode-btn {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.42rem 0.85rem;
+  background: transparent;
+  color: #355f3f;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mode-btn-active {
+  background: #2f7f45;
+  color: #fff;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(57, 95, 67, 0.12);
+}
+
+.bed-card {
+  border-radius: 1rem;
+  border: 1px solid rgba(47, 84, 55, 0.16);
+  background: linear-gradient(160deg, #ffffff 0%, #f0f6ec 100%);
+  padding: 0.6rem;
+  text-align: left;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.bed-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(44, 95, 58, 0.32);
+  box-shadow: 0 10px 16px rgba(45, 79, 54, 0.12);
+}
+
+.bed-card-active {
+  border-color: #2f7f45;
+  box-shadow: 0 0 0 2px rgba(71, 140, 90, 0.2);
+}
+
+.mode-dashboard .bed-card {
+  background: linear-gradient(150deg, #ffffff 0%, #e9f3e3 100%);
+}
+
+.highbed-card {
+  border-radius: 1rem;
+  border: 1px solid rgba(47, 84, 55, 0.16);
+  background: linear-gradient(160deg, #ffffff 0%, #eef5e8 100%);
+  padding: 0.85rem;
+}
+
+.highbed-active {
+  border-color: #2f7f45;
+  box-shadow: 0 0 0 2px rgba(71, 140, 90, 0.2);
+}
+
+.field {
+  width: 100%;
+  border-radius: 0.8rem;
+  border: 1px solid rgba(35, 75, 48, 0.18);
+  background: #fffef9;
+  padding: 0.62rem 0.72rem;
+  outline: none;
+}
+
+.field:focus {
+  border-color: #2f7f45;
+  box-shadow: 0 0 0 3px rgba(67, 131, 84, 0.18);
+}
+
+.upload { display: block; width: 100%; font-size: 0.9rem; color: #4a5b4e; }
+.upload::file-selector-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.45rem 0.75rem;
+  margin-right: 0.5rem;
+  background: #d9ebd6;
+  color: #1e5f34;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-primary {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.52rem 0.9rem;
+  background: #2f7f45;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-ghost {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.48rem 0.8rem;
+  background: #f0efe4;
+  color: #4f4e41;
+  font-weight: 700;
+  cursor: pointer;
+}
