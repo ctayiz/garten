@@ -37,11 +37,8 @@ type HighBedEntry = { plants: HighBedPlant[]; photo: string; updatedAt: string }
 type BedKey = `beet-${number}` | "hochbeet-1" | "hochbeet-2";
 type ViewMode = "editorial" | "dashboard";
 
-const STORAGE_KEY = "beet-tracker-v6";
-const LEGACY_STORAGE_KEYS = ["beet-tracker-v5", "beet-tracker-v4", "beet-tracker-v3", "beet-tracker-v2", "beet-tracker-v1"];
-const DB_NAME = "beet-tracker-db";
-const DB_STORE = "kv";
-const DB_KEY = "state";
+const PIN_SESSION_KEY = "garden-pin-unlocked";
+const PIN_VALUE_KEY = "garden-pin-value";
 const mainBedKeys = Array.from({ length: 15 }, (_, i) => `beet-${i + 1}` as BedKey);
 const highBedKeys: BedKey[] = ["hochbeet-1", "hochbeet-2"];
 
@@ -92,6 +89,16 @@ export default function Home() {
   });
   const [viewMode, setViewMode] = useState<ViewMode>("editorial");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [isUnlocked, setIsUnlocked] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return sessionStorage.getItem(PIN_SESSION_KEY) === "1";
+  });
+  const [pinValue, setPinValue] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return sessionStorage.getItem(PIN_VALUE_KEY) || "";
+  });
   const [savedHint, setSavedHint] = useState(false);
   const [storageError, setStorageError] = useState<string>("");
   const [isLoaded, setIsLoaded] = useState(false);
@@ -100,22 +107,27 @@ export default function Home() {
 
   useEffect(() => {
     const load = async () => {
-      let raw: string | null = null;
-      const idbState = await idbGet<string>(DB_KEY);
-      if (idbState) raw = idbState;
-      if (!raw) raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        for (const legacyKey of LEGACY_STORAGE_KEYS) {
-          raw = localStorage.getItem(legacyKey);
-          if (raw) break;
-        }
-      }
-      if (!raw) {
+      if (!isUnlocked) return;
+      if (!pinValue) {
         setIsLoaded(true);
         return;
       }
       try {
-      const parsed = JSON.parse(raw) as {
+        const response = await fetch("/api/state", {
+          headers: { "x-pin": pinValue },
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          setStorageError("Datenbank konnte nicht geladen werden.");
+          setIsLoaded(true);
+          return;
+        }
+        const payload = (await response.json()) as { state: unknown };
+        if (!payload.state) {
+          setIsLoaded(true);
+          return;
+        }
+        const parsed = payload.state as {
         mainBeds?: Record<string, Partial<MainBedEntry> & { photo?: string }>;
         highBeds?: Record<string, Partial<HighBedEntry> & { crop?: string; variety?: string; notes?: string; infoUrl?: string; photo?: string }>;
       };
@@ -159,23 +171,37 @@ export default function Home() {
 
       setMainBeds(mergedMain);
       setHighBeds(mergedHigh);
-      } catch {}
+      } catch {
+        setStorageError("Datenbank konnte nicht geladen werden.");
+      }
       setIsLoaded(true);
     };
     void load();
-  }, []);
+  }, [isUnlocked, pinValue]);
 
   useEffect(() => {
-    if (!isLoaded) return;
-    try {
-      const payload = JSON.stringify({ mainBeds, highBeds });
-      localStorage.setItem(STORAGE_KEY, payload);
-      void idbSet(DB_KEY, payload);
-      setStorageError("");
-    } catch {
-      setStorageError("Speicher voll: Bitte kleinere Bilder nutzen oder ein altes Bild entfernen.");
-    }
-  }, [mainBeds, highBeds, isLoaded]);
+    if (!isLoaded || !isUnlocked || !pinValue) return;
+    const save = async () => {
+      try {
+        const response = await fetch("/api/state", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "x-pin": pinValue,
+          },
+          body: JSON.stringify({ state: { mainBeds, highBeds } }),
+        });
+        if (!response.ok) {
+          setStorageError("Datenbank konnte nicht gespeichert werden.");
+          return;
+        }
+        setStorageError("");
+      } catch {
+        setStorageError("Datenbank konnte nicht gespeichert werden.");
+      }
+    };
+    void save();
+  }, [mainBeds, highBeds, isLoaded, isUnlocked, pinValue]);
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -319,6 +345,60 @@ export default function Home() {
     if (isHighBed(selectedKey)) setHighBeds((prev) => ({ ...prev, [selectedKey]: { ...emptyHighEntry } }));
     else setMainBeds((prev) => ({ ...prev, [selectedKey]: { ...emptyMainEntry } }));
   };
+
+  const unlockWithPin = async () => {
+    try {
+      const response = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: pinInput }),
+      });
+      if (!response.ok) {
+        setPinError("PIN ist falsch.");
+        return;
+      }
+      sessionStorage.setItem(PIN_SESSION_KEY, "1");
+      sessionStorage.setItem(PIN_VALUE_KEY, pinInput);
+      setPinValue(pinInput);
+      setIsUnlocked(true);
+      setPinError("");
+      setPinInput("");
+    } catch {
+      setPinError("Login fehlgeschlagen.");
+    }
+  };
+
+  if (!isUnlocked) {
+    return (
+      <main className="garden-bg min-h-screen px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto flex min-h-[70vh] w-full max-w-md items-center justify-center">
+          <section className="surface w-full rounded-3xl p-6 sm:p-7">
+            <h1 className="text-2xl font-black text-emerald-950">Garten Login</h1>
+            <p className="mt-2 text-sm text-zinc-600">Bitte PIN eingeben, um die App zu öffnen.</p>
+            <label className="mt-4 block">
+              <span className="mb-1 block text-xs font-bold tracking-wide text-zinc-600 uppercase">PIN</span>
+              <input
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={8}
+                value={pinInput}
+                onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ""))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") unlockWithPin();
+                }}
+                className="field"
+                placeholder="****"
+                autoFocus
+              />
+            </label>
+            {pinError ? <p className="mt-2 text-xs font-semibold text-rose-700">{pinError}</p> : null}
+            <button onClick={unlockWithPin} className="btn-primary mt-4 w-full py-2.5">Öffnen</button>
+          </section>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className={`garden-bg ${viewMode === "dashboard" ? "mode-dashboard" : "mode-editorial"} min-h-screen px-4 py-6 sm:px-6 lg:px-8`}>
@@ -577,43 +657,5 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error("Bild konnte nicht geladen werden"));
     img.src = src;
-  });
-}
-
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE);
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function idbGet<T>(key: string): Promise<T | null> {
-  try {
-    const db = await openDb();
-    return await new Promise<T | null>((resolve, reject) => {
-      const tx = db.transaction(DB_STORE, "readonly");
-      const store = tx.objectStore(DB_STORE);
-      const req = store.get(key);
-      req.onsuccess = () => resolve((req.result as T) ?? null);
-      req.onerror = () => reject(req.error);
-    });
-  } catch {
-    return null;
-  }
-}
-
-async function idbSet<T>(key: string, value: T): Promise<void> {
-  const db = await openDb();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(DB_STORE, "readwrite");
-    const store = tx.objectStore(DB_STORE);
-    const req = store.put(value, key);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
   });
 }
