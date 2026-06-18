@@ -282,6 +282,7 @@ export default function Home() {
 
   const selectedMain = !isHighBed(selectedKey) ? mainBeds[selectedKey] : null;
   const selectedHigh = isHighBed(selectedKey) ? highBeds[selectedKey] : null;
+  const selectedHighPlant = selectedHigh?.plants.find((plant) => plant.id === activeProgressPlantId) || selectedHigh?.plants[0] || null;
   const legacyImageCount = useMemo(() => countLegacyImages(mainBeds, highBeds), [mainBeds, highBeds]);
 
   const openModal = (key: BedKey) => {
@@ -294,8 +295,8 @@ export default function Home() {
   };
 
   const openProgressModal = (key: BedKey) => {
-    if (isHighBed(key)) return;
     setSelectedKey(key);
+    setActiveProgressPlantId(isHighBed(key) ? highBeds[key].plants[0]?.id || null : null);
     setProgressDraft({ date: new Date().toISOString().slice(0, 10), photo: "", note: "" });
     setSavedHint(false);
     setStorageError("");
@@ -431,11 +432,6 @@ export default function Home() {
     updateMainEntry({ progress: mainBeds[selectedKey].progress.filter((entry) => entry.id !== id) });
   };
 
-  const openHighProgress = (plantId: string) => {
-    setActiveProgressPlantId((current) => (current === plantId ? null : plantId));
-    resetProgressDraft();
-  };
-
   const addHighProgress = (plantId: string) => {
     if (!isHighBed(selectedKey) || !progressDraft.photo || !progressDraft.date) return;
     updateHighEntry({
@@ -452,7 +448,6 @@ export default function Home() {
       ),
     });
     resetProgressDraft();
-    setActiveProgressPlantId(null);
   };
 
   const removeHighProgress = (plantId: string, progressId: string) => {
@@ -622,6 +617,9 @@ export default function Home() {
                   <button onClick={() => openModal(key)} className="btn-primary mt-3 w-full py-2 text-sm">
                     {item.photo || item.plants.length > 0 ? "Bearbeiten" : "Hinzufügen"}
                   </button>
+                  <button onClick={() => openProgressModal(key)} disabled={item.plants.length === 0} className="btn-ghost mt-2 w-full py-2 text-sm disabled:cursor-not-allowed disabled:opacity-45">
+                    + Zwischenstand
+                  </button>
                 </div>
               );
             })}
@@ -712,15 +710,6 @@ export default function Home() {
                           {plant.currentPhoto ? <img src={plant.currentPhoto} alt="Aktuell" loading="lazy" decoding="async" className="h-16 w-16 cursor-zoom-in rounded-lg object-cover" onClick={() => setZoomImage({ src: plant.currentPhoto, label: `${plant.crop} · Aktuell` })} /> : null}
                           {plant.finalPhoto ? <img src={plant.finalPhoto} alt="Endstadium" loading="lazy" decoding="async" className="h-16 w-16 cursor-zoom-in rounded-lg object-cover" onClick={() => setZoomImage({ src: plant.finalPhoto, label: `${plant.crop} · Endstadium` })} /> : null}
                         </div>
-                        <button onClick={() => openHighProgress(plant.id)} className="btn-ghost mt-3 w-full text-sm sm:w-auto">
-                          {activeProgressPlantId === plant.id ? "Abbrechen" : "+ Zwischenstand"}
-                        </button>
-                        {activeProgressPlantId === plant.id ? (
-                          <div className="mt-3 rounded-xl bg-emerald-50/80 p-3">
-                            <ProgressComposer draft={progressDraft} setDraft={setProgressDraft} onPhoto={handleProgressPhoto} onAdd={() => addHighProgress(plant.id)} />
-                          </div>
-                        ) : null}
-                        <ProgressTimeline entries={plant.progress} label={plant.crop} onZoom={setZoomImage} onDelete={(progressId) => removeHighProgress(plant.id, progressId)} />
                       </div>
                     ))}
                   </div>
@@ -733,14 +722,14 @@ export default function Home() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {isProgressModalOpen && selectedMain ? (
+        {isProgressModalOpen && (selectedMain || selectedHigh) ? (
           <motion.div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-3 sm:items-center sm:p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsProgressModalOpen(false)}>
             <motion.div className="surface max-h-[92vh] w-full max-w-2xl overflow-auto rounded-3xl p-4 sm:p-6" initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }} onClick={(event) => event.stopPropagation()}>
               <div className="mb-5 flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold tracking-wide text-emerald-700 uppercase">Neuer Zwischenstand</p>
-                  <h2 className="mt-1 text-2xl font-black text-emerald-950">{selectedMain.crop || slotLabel(selectedKey)}</h2>
-                  <p className="mt-1 text-sm text-zinc-500">{selectedMain.variety || slotLabel(selectedKey)}</p>
+                  <h2 className="mt-1 text-2xl font-black text-emerald-950">{selectedMain?.crop || selectedHighPlant?.crop || slotLabel(selectedKey)}</h2>
+                  <p className="mt-1 text-sm text-zinc-500">{selectedMain?.variety || selectedHighPlant?.variety || slotLabel(selectedKey)}</p>
                 </div>
                 <button type="button" className="btn-ghost shrink-0" onClick={() => setIsProgressModalOpen(false)}>Schließen</button>
               </div>
@@ -748,15 +737,49 @@ export default function Home() {
               {storageError ? <p className="mb-3 rounded-xl bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{storageError}</p> : null}
               {isUploading ? <p className="mb-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">Bild wird komprimiert und hochgeladen ...</p> : null}
 
-              <ProgressComposer draft={progressDraft} setDraft={setProgressDraft} onPhoto={handleProgressPhoto} onAdd={addMainProgress} />
-
-              <div className="mt-6 border-t border-emerald-900/10 pt-5">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-bold tracking-wide text-zinc-600 uppercase">Bisheriger Verlauf</p>
-                  <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">{selectedMain.progress.length}</span>
+              {selectedHigh ? (
+                selectedHigh.plants.length > 0 && selectedHighPlant ? (
+                  <div>
+                    <Field label="Pflanze im Hochbeet">
+                      <select
+                        className="field"
+                        value={selectedHighPlant.id}
+                        onChange={(event) => {
+                          setActiveProgressPlantId(event.target.value);
+                          resetProgressDraft();
+                        }}
+                      >
+                        {selectedHigh.plants.map((plant) => (
+                          <option key={plant.id} value={plant.id}>{plant.crop}{plant.variety ? ` · ${plant.variety}` : ""}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    <div className="mt-4">
+                      <ProgressComposer draft={progressDraft} setDraft={setProgressDraft} onPhoto={handleProgressPhoto} onAdd={() => addHighProgress(selectedHighPlant.id)} />
+                    </div>
+                    <div className="mt-6 border-t border-emerald-900/10 pt-5">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs font-bold tracking-wide text-zinc-600 uppercase">Bisheriger Verlauf</p>
+                        <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">{selectedHighPlant.progress.length}</span>
+                      </div>
+                      <ProgressTimeline entries={selectedHighPlant.progress} label={selectedHighPlant.crop} onZoom={setZoomImage} onDelete={(progressId) => removeHighProgress(selectedHighPlant.id, progressId)} />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl bg-amber-50 p-4 text-sm font-semibold text-amber-900">Bitte zuerst über „Bearbeiten“ eine Pflanze zum Hochbeet hinzufügen.</div>
+                )
+              ) : selectedMain ? (
+                <div>
+                  <ProgressComposer draft={progressDraft} setDraft={setProgressDraft} onPhoto={handleProgressPhoto} onAdd={addMainProgress} />
+                  <div className="mt-6 border-t border-emerald-900/10 pt-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-bold tracking-wide text-zinc-600 uppercase">Bisheriger Verlauf</p>
+                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">{selectedMain.progress.length}</span>
+                    </div>
+                    <ProgressTimeline entries={selectedMain.progress} label={selectedMain.crop || slotLabel(selectedKey)} onZoom={setZoomImage} onDelete={removeMainProgress} />
+                  </div>
                 </div>
-                <ProgressTimeline entries={selectedMain.progress} label={selectedMain.crop || slotLabel(selectedKey)} onZoom={setZoomImage} onDelete={removeMainProgress} />
-              </div>
+              ) : null}
             </motion.div>
           </motion.div>
         ) : null}
