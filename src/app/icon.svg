@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="sky" x1="10" y1="6" x2="52" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fbf3cf"/>
+      <stop offset="1" stop-color="#d8e5bd"/>
+    </linearGradient>
+    <linearGradient id="leaf" x1="25" y1="21" x2="43" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4f995a"/>
+      <stop offset="1" stop-color="#1f5b34"/>
+    </linearGradient>
+  </defs>
+  <circle cx="32" cy="32" r="30" fill="url(#sky)" stroke="#1d4d2e" stroke-width="4"/>
+  <circle cx="46" cy="17" r="7" fill="#e8ad3d"/>
+  <path d="M6 46c9-5 18-5 26 0 8-5 17-5 26 0v11H6V46Z" fill="#8a5b3c"/>
+  <path d="M32 49V27" fill="none" stroke="#245f37" stroke-linecap="round" stroke-width="5"/>
+  <path d="M31 34c-9 1-15-4-15-12 9-1 15 4 15 12Z" fill="url(#leaf)" stroke="#1f5b34" stroke-linejoin="round" stroke-width="2"/>
+  <path d="M33 29c2-9 8-13 17-10-2 9-8 13-17 10Z" fill="url(#leaf)" stroke="#1f5b34" stroke-linejoin="round" stroke-width="2"/>
+  <path d="M20 51h24" fill="none" stroke="#d6a16f" stroke-linecap="round" stroke-width="3"/>
+</svg>
