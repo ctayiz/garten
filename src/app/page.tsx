@@ -110,6 +110,7 @@ export default function Home() {
   const [activeProgressPlantId, setActiveProgressPlantId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("editorial");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState("");
   const [isUnlocked, setIsUnlocked] = useState(() => {
@@ -245,6 +246,15 @@ export default function Home() {
   }, [isModalOpen]);
 
   useEffect(() => {
+    if (!isProgressModalOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsProgressModalOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isProgressModalOpen]);
+
+  useEffect(() => {
     if (!zoomImage) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setZoomImage(null);
@@ -281,6 +291,15 @@ export default function Home() {
     setProgressDraft({ date: new Date().toISOString().slice(0, 10), photo: "", note: "" });
     setActiveProgressPlantId(null);
     setSavedHint(false);
+  };
+
+  const openProgressModal = (key: BedKey) => {
+    if (isHighBed(key)) return;
+    setSelectedKey(key);
+    setProgressDraft({ date: new Date().toISOString().slice(0, 10), photo: "", note: "" });
+    setSavedHint(false);
+    setStorageError("");
+    setIsProgressModalOpen(true);
   };
 
   const updateMainEntry = (patch: Partial<MainBedEntry>) => {
@@ -578,10 +597,10 @@ export default function Home() {
 
         <section className="surface rounded-3xl p-4 sm:p-5">
           <p className="mb-3 text-xs font-bold tracking-[0.18em] text-zinc-500 uppercase">Hintere Reihe (an der Mauer) · 8 Felder</p>
-          <BeetRow keysRow={row1} mainBeds={mainBeds} openModal={openModal} setZoomImage={setZoomImage} />
+          <BeetRow keysRow={row1} mainBeds={mainBeds} openModal={openModal} openProgressModal={openProgressModal} setZoomImage={setZoomImage} />
           <div className="h-3" />
           <p className="mb-3 mt-1 text-xs font-bold tracking-[0.18em] text-zinc-500 uppercase">Vordere Reihe (am Weg) · 7 Felder</p>
-          <BeetRow keysRow={row2} mainBeds={mainBeds} openModal={openModal} setZoomImage={setZoomImage} />
+          <BeetRow keysRow={row2} mainBeds={mainBeds} openModal={openModal} openProgressModal={openProgressModal} setZoomImage={setZoomImage} />
         </section>
 
         <section className="surface rounded-3xl p-4 sm:p-5">
@@ -635,17 +654,6 @@ export default function Home() {
                     <Field label="Aktuelles Bild"><input type="file" accept="image/*" onChange={(e) => handleMainPhoto("currentPhoto", e)} className="upload" />{selectedMain.currentPhoto ? <img src={selectedMain.currentPhoto} alt="Aktuell" loading="lazy" decoding="async" className="mt-2 h-20 w-20 cursor-zoom-in rounded-lg object-cover" onClick={() => setZoomImage({ src: selectedMain.currentPhoto, label: "Aktuelles Bild" })} /> : null}</Field>
                     <Field label="Endstadium Bild"><input type="file" accept="image/*" onChange={(e) => handleMainPhoto("finalPhoto", e)} className="upload" />{selectedMain.finalPhoto ? <img src={selectedMain.finalPhoto} alt="Endstadium" loading="lazy" decoding="async" className="mt-2 h-20 w-20 cursor-zoom-in rounded-lg object-cover" onClick={() => setZoomImage({ src: selectedMain.finalPhoto, label: "Endstadium Bild" })} /> : null}</Field>
                   </div>
-                  <section className="rounded-2xl border border-emerald-900/10 bg-white/70 p-3 sm:p-4">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-bold tracking-wide text-zinc-600 uppercase">Wachstumsverlauf</p>
-                        <p className="mt-1 text-xs text-zinc-500">Zwischenstände mit Datum dokumentieren.</p>
-                      </div>
-                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">{selectedMain.progress.length}</span>
-                    </div>
-                    <ProgressComposer draft={progressDraft} setDraft={setProgressDraft} onPhoto={handleProgressPhoto} onAdd={addMainProgress} />
-                    <ProgressTimeline entries={selectedMain.progress} label={selectedMain.crop || slotLabel(selectedKey)} onZoom={setZoomImage} onDelete={removeMainProgress} />
-                  </section>
                   <div className="pt-2"><button onClick={clearCurrent} className="btn-ghost">Feld leeren</button></div>
 
                   <div className="mt-3 rounded-2xl border border-emerald-900/10 bg-emerald-50/70 p-3">
@@ -725,6 +733,36 @@ export default function Home() {
       </AnimatePresence>
 
       <AnimatePresence>
+        {isProgressModalOpen && selectedMain ? (
+          <motion.div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-3 sm:items-center sm:p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsProgressModalOpen(false)}>
+            <motion.div className="surface max-h-[92vh] w-full max-w-2xl overflow-auto rounded-3xl p-4 sm:p-6" initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }} onClick={(event) => event.stopPropagation()}>
+              <div className="mb-5 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold tracking-wide text-emerald-700 uppercase">Neuer Zwischenstand</p>
+                  <h2 className="mt-1 text-2xl font-black text-emerald-950">{selectedMain.crop || slotLabel(selectedKey)}</h2>
+                  <p className="mt-1 text-sm text-zinc-500">{selectedMain.variety || slotLabel(selectedKey)}</p>
+                </div>
+                <button type="button" className="btn-ghost shrink-0" onClick={() => setIsProgressModalOpen(false)}>Schließen</button>
+              </div>
+
+              {storageError ? <p className="mb-3 rounded-xl bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{storageError}</p> : null}
+              {isUploading ? <p className="mb-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">Bild wird komprimiert und hochgeladen ...</p> : null}
+
+              <ProgressComposer draft={progressDraft} setDraft={setProgressDraft} onPhoto={handleProgressPhoto} onAdd={addMainProgress} />
+
+              <div className="mt-6 border-t border-emerald-900/10 pt-5">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-bold tracking-wide text-zinc-600 uppercase">Bisheriger Verlauf</p>
+                  <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">{selectedMain.progress.length}</span>
+                </div>
+                <ProgressTimeline entries={selectedMain.progress} label={selectedMain.crop || slotLabel(selectedKey)} onZoom={setZoomImage} onDelete={removeMainProgress} />
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {zoomImage ? (
           <motion.div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setZoomImage(null)}>
             <motion.div className="max-w-5xl" initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.96, opacity: 0 }} onClick={(e) => e.stopPropagation()}>
@@ -742,11 +780,13 @@ function BeetRow({
   keysRow,
   mainBeds,
   openModal,
+  openProgressModal,
   setZoomImage,
 }: {
   keysRow: BedKey[];
   mainBeds: Record<BedKey, MainBedEntry>;
   openModal: (k: BedKey) => void;
+  openProgressModal: (k: BedKey) => void;
   setZoomImage: (value: { src: string; label: string } | null) => void;
 }) {
   return (
@@ -782,6 +822,9 @@ function BeetRow({
               {item.progress.length ? <div className="mt-1 text-[11px] font-semibold text-emerald-700">{item.progress.length} Zwischenstände</div> : null}
               <button onClick={() => openModal(key)} className="btn-primary mt-3 w-full py-2 text-sm">
                 {hasData ? "Bearbeiten" : "Hinzufügen"}
+              </button>
+              <button onClick={() => openProgressModal(key)} className="btn-ghost mt-2 w-full py-2 text-sm">
+                + Zwischenstand
               </button>
             </div>
           );
