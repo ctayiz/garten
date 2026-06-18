@@ -559,12 +559,13 @@ export default function Home() {
         <section className="hero-card rounded-3xl p-6 sm:p-7">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-3xl font-black tracking-tight text-emerald-950 sm:text-5xl">Gemüsegarten</h1>
-              <p className="mt-2 text-sm text-emerald-900/75">Vollbreite Übersicht, Bearbeitung per Modal. Pro Pflanze: Link + aktuelles Bild + Endstadium.</p>
+              <p className="garden-kicker">Persönliches Gartenjournal · Saison 2026</p>
+              <h1 className="garden-title mt-2 text-4xl font-black tracking-tight text-emerald-950 sm:text-6xl">Mein <span>Gartenjahr</span></h1>
+              <p className="mt-3 max-w-xl text-sm leading-relaxed text-emerald-950/70 sm:text-base">Vom ersten Setzling bis zur Ernte: Beete planen, Pflanzen begleiten und jeden Wachstumsmoment festhalten.</p>
             </div>
             <div className="flex gap-2 rounded-full bg-white/55 p-1">
-              <button onClick={() => setViewMode("editorial")} className={`mode-btn ${viewMode === "editorial" ? "mode-btn-active" : ""}`}>Editorial Garden</button>
-              <button onClick={() => setViewMode("dashboard")} className={`mode-btn ${viewMode === "dashboard" ? "mode-btn-active" : ""}`}>Farm Dashboard Pro</button>
+              <button onClick={() => setViewMode("editorial")} className={`mode-btn ${viewMode === "editorial" ? "mode-btn-active" : ""}`}>Gartenjournal</button>
+              <button onClick={() => setViewMode("dashboard")} className={`mode-btn ${viewMode === "dashboard" ? "mode-btn-active" : ""}`}>Beetübersicht</button>
             </div>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

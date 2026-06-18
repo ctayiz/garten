@@ -1,36 +1,131 @@
 @import "tailwindcss";
 
-:root { color-scheme: light; }
+:root {
+  color-scheme: light;
+  --leaf-950: #173d27;
+  --leaf-800: #245c36;
+  --leaf-600: #3f8150;
+  --sage-200: #d9e4c9;
+  --cream: #fbf7e9;
+  --soil: #8a5b3c;
+  --sun: #e3a93f;
+}
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 html, body { overflow-x: hidden; }
-body { font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif; color: #1c2a20; }
+body { font-family: var(--font-geist-sans), "Avenir Next", sans-serif; color: #1c2a20; background: #eef2e5; }
 
 .garden-bg {
+  position: relative;
+  isolation: isolate;
   background:
-    radial-gradient(circle at 8% 10%, rgba(153, 196, 142, 0.18), transparent 30%),
-    radial-gradient(circle at 90% 12%, rgba(224, 202, 157, 0.16), transparent 34%),
-    linear-gradient(180deg, #f2f6ec 0%, #edf3e7 45%, #f8f4ea 100%);
+    radial-gradient(circle at 7% 6%, rgba(225, 174, 78, 0.22), transparent 23rem),
+    radial-gradient(ellipse at 94% 18%, rgba(75, 132, 74, 0.2), transparent 30rem),
+    repeating-linear-gradient(92deg, transparent 0 84px, rgba(70, 99, 59, 0.025) 84px 86px),
+    linear-gradient(180deg, #edf3e3 0%, #f5f4e8 48%, #eee9da 100%);
+}
+
+.garden-bg::before,
+.garden-bg::after {
+  position: fixed;
+  z-index: -1;
+  content: "";
+  pointer-events: none;
+}
+
+.garden-bg::before {
+  top: 7rem;
+  right: -4.5rem;
+  width: 15rem;
+  height: 26rem;
+  opacity: 0.2;
+  background:
+    radial-gradient(ellipse at 20% 15%, #2f7040 0 18%, transparent 19%),
+    radial-gradient(ellipse at 76% 34%, #4b8952 0 17%, transparent 18%),
+    radial-gradient(ellipse at 24% 54%, #3b7c48 0 19%, transparent 20%),
+    radial-gradient(ellipse at 70% 76%, #5a945c 0 17%, transparent 18%);
+  transform: rotate(-18deg);
+}
+
+.garden-bg::after {
+  bottom: 2rem;
+  left: -3rem;
+  width: 13rem;
+  height: 13rem;
+  border: 1.25rem solid rgba(75, 112, 61, 0.08);
+  border-radius: 48% 52% 62% 38%;
+  transform: rotate(24deg);
 }
 
 .mode-editorial .hero-card {
-  background: linear-gradient(145deg, #e8f1e2 0%, #dcead3 52%, #d2e3c6 100%);
+  background: linear-gradient(135deg, #f7f1d9 0%, #e1ebcf 46%, #c7d9b4 100%);
 }
 
 .mode-dashboard .hero-card {
-  background: linear-gradient(145deg, #d8ead0 0%, #cde3c1 52%, #c4dcba 100%);
+  background: linear-gradient(135deg, #e7ecd7 0%, #d0dfbf 52%, #b8d0aa 100%);
   border-color: rgba(24, 73, 41, 0.24);
 }
 
 .hero-card {
-  border: 1px solid rgba(43, 84, 54, 0.16);
-  box-shadow: 0 10px 28px rgba(38, 62, 44, 0.08);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(53, 84, 45, 0.18);
+  box-shadow: 0 16px 40px rgba(64, 69, 42, 0.1);
+}
+
+.hero-card::before {
+  position: absolute;
+  top: -5.5rem;
+  right: 8%;
+  width: 13rem;
+  height: 13rem;
+  border: 1px solid rgba(157, 108, 30, 0.18);
+  border-radius: 50%;
+  background: rgba(245, 194, 85, 0.28);
+  content: "";
+}
+
+.hero-card::after {
+  position: absolute;
+  right: -3rem;
+  bottom: -5.5rem;
+  width: 24rem;
+  height: 11rem;
+  border-radius: 50% 50% 0 0;
+  background: rgba(48, 104, 55, 0.1);
+  content: "";
+  transform: rotate(-7deg);
+}
+
+.hero-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.garden-kicker {
+  color: var(--soil);
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.garden-title {
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 0.94;
+}
+
+.garden-title span {
+  color: var(--leaf-600);
+  font-style: italic;
+  font-weight: 700;
 }
 
 .surface {
-  background: rgba(255, 253, 246, 0.9);
-  border: 1px solid rgba(52, 90, 60, 0.14);
-  box-shadow: 0 8px 24px rgba(35, 58, 41, 0.06);
+  background: rgba(255, 252, 241, 0.91);
+  border: 1px solid rgba(78, 92, 55, 0.14);
+  box-shadow: 0 10px 28px rgba(58, 57, 38, 0.07);
+  backdrop-filter: blur(12px);
 }
 
 .mode-dashboard .surface {
@@ -50,19 +145,22 @@ body { font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif; colo
 }
 
 .mode-btn-active {
-  background: #2f7f45;
+  background: var(--leaf-800);
   color: #fff;
 }
 
 .stat-card {
-  background: rgba(255, 255, 255, 0.62);
-  border: 1px solid rgba(57, 95, 67, 0.12);
+  background: rgba(255, 253, 244, 0.7);
+  border: 1px solid rgba(91, 92, 52, 0.14);
+  box-shadow: inset 0 -2px 0 rgba(138, 91, 60, 0.07);
 }
 
 .bed-card {
+  position: relative;
+  overflow: hidden;
   border-radius: 1rem;
-  border: 1px solid rgba(47, 84, 55, 0.16);
-  background: linear-gradient(160deg, #ffffff 0%, #f0f6ec 100%);
+  border: 1px solid rgba(64, 91, 56, 0.17);
+  background: linear-gradient(160deg, #fffdf5 0%, #eef4e6 100%);
   padding: 0.6rem;
   text-align: left;
   transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
@@ -71,7 +169,17 @@ body { font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif; colo
 .bed-card:hover {
   transform: translateY(-3px);
   border-color: rgba(44, 95, 58, 0.32);
-  box-shadow: 0 10px 16px rgba(45, 79, 54, 0.12);
+  box-shadow: 0 12px 20px rgba(62, 71, 43, 0.12);
+}
+
+.bed-card::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--soil), var(--sun), var(--leaf-600));
+  content: "";
 }
 
 .bed-card-active {
@@ -84,10 +192,24 @@ body { font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif; colo
 }
 
 .highbed-card {
+  position: relative;
+  overflow: hidden;
   border-radius: 1rem;
-  border: 1px solid rgba(47, 84, 55, 0.16);
-  background: linear-gradient(160deg, #ffffff 0%, #eef5e8 100%);
+  border: 1px solid rgba(83, 88, 51, 0.17);
+  background: linear-gradient(160deg, #fffaf0 0%, #eaf2df 100%);
   padding: 0.85rem;
+}
+
+.highbed-card::after {
+  position: absolute;
+  right: -2.2rem;
+  bottom: -2.8rem;
+  width: 7rem;
+  height: 7rem;
+  border: 0.8rem solid rgba(63, 129, 80, 0.08);
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
 }
 
 .highbed-active {
@@ -125,18 +247,36 @@ body { font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif; colo
   border: 0;
   border-radius: 999px;
   padding: 0.52rem 0.9rem;
-  background: #2f7f45;
+  background: linear-gradient(135deg, var(--leaf-800), #357846);
   color: #fff;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: 0 3px 0 #183d26;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 #183d26;
+}
+
+.btn-primary:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #183d26;
 }
 
 .btn-ghost {
   border: 0;
   border-radius: 999px;
   padding: 0.48rem 0.8rem;
-  background: #f0efe4;
-  color: #4f4e41;
+  background: #eee9d7;
+  color: #4f513d;
   font-weight: 700;
   cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .garden-bg::before { opacity: 0.11; }
+  .hero-card::before { right: -4rem; }
+  .garden-title { max-width: 14rem; }
 }
