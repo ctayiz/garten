@@ -123,6 +123,8 @@ export default function Home() {
   const [savedHint, setSavedHint] = useState(false);
   const [storageError, setStorageError] = useState<string>("");
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isMigratingImages, setIsMigratingImages] = useState(false);
   const [zoomImage, setZoomImage] = useState<{ src: string; label: string } | null>(null);
   const firstInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -223,7 +225,8 @@ export default function Home() {
         setStorageError("Datenbank konnte nicht gespeichert werden.");
       }
     };
-    void save();
+    const timer = window.setTimeout(() => void save(), 500);
+    return () => window.clearTimeout(timer);
   }, [mainBeds, highBeds, isLoaded, isUnlocked, pinValue]);
 
   useEffect(() => {
@@ -269,6 +272,7 @@ export default function Home() {
 
   const selectedMain = !isHighBed(selectedKey) ? mainBeds[selectedKey] : null;
   const selectedHigh = isHighBed(selectedKey) ? highBeds[selectedKey] : null;
+  const legacyImageCount = useMemo(() => countLegacyImages(mainBeds, highBeds), [mainBeds, highBeds]);
 
   const openModal = (key: BedKey) => {
     setSelectedKey(key);
@@ -334,32 +338,58 @@ export default function Home() {
     setSavedHint(true);
   };
 
+  const uploadGardenPhoto = async (file: File, maxSize: number, quality: number) => {
+    setIsUploading(true);
+    setStorageError("");
+    try {
+      const compressed = await compressImageToBlob(file, maxSize, quality);
+      const formData = new FormData();
+      formData.append("file", compressed, file.name);
+      const response = await fetch("/api/uploads", {
+        method: "POST",
+        headers: { "x-pin": pinValue },
+        body: formData,
+      });
+      const payload = (await response.json()) as { url?: string; details?: string };
+      if (!response.ok || !payload.url) {
+        throw new Error(payload.details || "Bild konnte nicht hochgeladen werden");
+      }
+      return payload.url;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Bild konnte nicht hochgeladen werden";
+      setStorageError(message.includes("BLOB_READ_WRITE_TOKEN") ? "Vercel Blob ist noch nicht mit dem Projekt verbunden." : message);
+      return null;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleMainPhoto = async (kind: "currentPhoto" | "finalPhoto", event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || isHighBed(selectedKey)) return;
-    const photo = await compressImageToDataUrl(file, 1280, 0.72);
-    updateMainEntry({ [kind]: photo });
+    const photo = await uploadGardenPhoto(file, 1280, 0.72);
+    if (photo) updateMainEntry({ [kind]: photo });
   };
 
   const handleHighBedPhoto = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !isHighBed(selectedKey)) return;
-    const photo = await compressImageToDataUrl(file, 1280, 0.72);
-    updateHighEntry({ photo });
+    const photo = await uploadGardenPhoto(file, 1280, 0.72);
+    if (photo) updateHighEntry({ photo });
   };
 
   const handleNewPlantPhoto = async (kind: "currentPhoto" | "finalPhoto", event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const photo = await compressImageToDataUrl(file, 900, 0.7);
-    setNewPlant((prev) => ({ ...prev, [kind]: photo }));
+    const photo = await uploadGardenPhoto(file, 900, 0.7);
+    if (photo) setNewPlant((prev) => ({ ...prev, [kind]: photo }));
   };
 
   const handleProgressPhoto = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const photo = await compressImageToDataUrl(file, 1000, 0.68);
-    setProgressDraft((prev) => ({ ...prev, photo }));
+    const photo = await uploadGardenPhoto(file, 1000, 0.68);
+    if (photo) setProgressDraft((prev) => ({ ...prev, photo }));
   };
 
   const resetProgressDraft = () => {
@@ -431,6 +461,24 @@ export default function Home() {
   const clearCurrent = () => {
     if (isHighBed(selectedKey)) setHighBeds((prev) => ({ ...prev, [selectedKey]: { ...emptyHighEntry } }));
     else setMainBeds((prev) => ({ ...prev, [selectedKey]: { ...emptyMainEntry } }));
+  };
+
+  const migrateLegacyImages = async () => {
+    setIsMigratingImages(true);
+    setStorageError("");
+    try {
+      const response = await fetch("/api/migrate-images", {
+        method: "POST",
+        headers: { "x-pin": pinValue },
+      });
+      const payload = (await response.json()) as { migrated?: number; details?: string };
+      if (!response.ok) throw new Error(payload.details || "Alte Bilder konnten nicht migriert werden.");
+      window.location.reload();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Alte Bilder konnten nicht migriert werden.";
+      setStorageError(message.includes("BLOB_READ_WRITE_TOKEN") ? "Vercel Blob ist noch nicht mit dem Projekt verbunden." : message);
+      setIsMigratingImages(false);
+    }
   };
 
   if (!isClient) {
@@ -514,6 +562,17 @@ export default function Home() {
           <div className="mt-4 rounded-2xl border border-emerald-900/10 bg-white/60 px-4 py-3 text-sm text-emerald-900/80">
             Real-Mapping: obere Reihe = hinten an der Mauer (8 Felder), untere Reihe = vorne am Weg (7 Felder).
           </div>
+          {legacyImageCount > 0 ? (
+            <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-amber-700/20 bg-amber-50/90 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-extrabold text-amber-950">{legacyImageCount} ältere Bilder verlangsamen noch die App</p>
+                <p className="mt-1 text-xs text-amber-900/75">Einmalig zu Vercel Blob verschieben. Inhalte und Zuordnung bleiben erhalten.</p>
+              </div>
+              <button type="button" onClick={migrateLegacyImages} disabled={isMigratingImages} className="btn-primary shrink-0 disabled:opacity-50">
+                {isMigratingImages ? "Wird optimiert ..." : "Bilder jetzt optimieren"}
+              </button>
+            </div>
+          ) : null}
         </section>
 
         <section className="surface rounded-3xl p-4 sm:p-5">
@@ -536,7 +595,7 @@ export default function Home() {
                     onClick={() => item.photo && setZoomImage({ src: item.photo, label: `Hochbeet ${i + 1} · Gesamtbild` })}
                     className="mb-3 block h-44 w-full overflow-hidden rounded-xl border border-emerald-900/10 bg-emerald-50"
                   >
-                    {item.photo ? <img src={item.photo} alt={`Hochbeet ${i + 1}`} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-sm text-zinc-400">Kein Gesamtbild</div>}
+                    {item.photo ? <img src={item.photo} alt={`Hochbeet ${i + 1}`} loading="lazy" decoding="async" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-sm text-zinc-400">Kein Gesamtbild</div>}
                   </button>
                   <h3 className="text-xl font-extrabold text-emerald-950">Hochbeet {i + 1}</h3>
                   <p className="mt-1 text-sm text-zinc-600">Pflanzen: {item.plants.length}</p>
@@ -557,7 +616,8 @@ export default function Home() {
               <div className="mb-4 flex items-start justify-between gap-3">
                 <h2 className="text-2xl font-black text-emerald-950">{slotLabel(selectedKey)}</h2>
                 <div className="flex items-center gap-2">
-                  {savedHint ? <span className="text-xs font-bold text-emerald-700">Gespeichert</span> : null}
+                  {isUploading ? <span className="text-xs font-bold text-amber-700">Bild wird geladen ...</span> : null}
+                  {savedHint && !isUploading ? <span className="text-xs font-bold text-emerald-700">Gespeichert</span> : null}
                   <button className="btn-ghost" onClick={() => setIsModalOpen(false)}>Schließen</button>
                 </div>
               </div>
@@ -571,8 +631,8 @@ export default function Home() {
                   <Field label="Link (Infos) "><input className="field" value={selectedMain.infoUrl} onChange={(e) => updateMainEntry({ infoUrl: e.target.value })} placeholder="https://..." /></Field>
                   <Field label="Notizen"><textarea className="field min-h-24" value={selectedMain.notes} onChange={(e) => updateMainEntry({ notes: e.target.value })} /></Field>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <Field label="Aktuelles Bild"><input type="file" accept="image/*" onChange={(e) => handleMainPhoto("currentPhoto", e)} className="upload" />{selectedMain.currentPhoto ? <img src={selectedMain.currentPhoto} alt="Aktuell" className="mt-2 h-20 w-20 cursor-zoom-in rounded-lg object-cover" onClick={() => setZoomImage({ src: selectedMain.currentPhoto, label: "Aktuelles Bild" })} /> : null}</Field>
-                    <Field label="Endstadium Bild"><input type="file" accept="image/*" onChange={(e) => handleMainPhoto("finalPhoto", e)} className="upload" />{selectedMain.finalPhoto ? <img src={selectedMain.finalPhoto} alt="Endstadium" className="mt-2 h-20 w-20 cursor-zoom-in rounded-lg object-cover" onClick={() => setZoomImage({ src: selectedMain.finalPhoto, label: "Endstadium Bild" })} /> : null}</Field>
+                    <Field label="Aktuelles Bild"><input type="file" accept="image/*" onChange={(e) => handleMainPhoto("currentPhoto", e)} className="upload" />{selectedMain.currentPhoto ? <img src={selectedMain.currentPhoto} alt="Aktuell" loading="lazy" decoding="async" className="mt-2 h-20 w-20 cursor-zoom-in rounded-lg object-cover" onClick={() => setZoomImage({ src: selectedMain.currentPhoto, label: "Aktuelles Bild" })} /> : null}</Field>
+                    <Field label="Endstadium Bild"><input type="file" accept="image/*" onChange={(e) => handleMainPhoto("finalPhoto", e)} className="upload" />{selectedMain.finalPhoto ? <img src={selectedMain.finalPhoto} alt="Endstadium" loading="lazy" decoding="async" className="mt-2 h-20 w-20 cursor-zoom-in rounded-lg object-cover" onClick={() => setZoomImage({ src: selectedMain.finalPhoto, label: "Endstadium Bild" })} /> : null}</Field>
                   </div>
                   <section className="rounded-2xl border border-emerald-900/10 bg-white/70 p-3 sm:p-4">
                     <div className="mb-3 flex items-center justify-between gap-3">
@@ -622,8 +682,8 @@ export default function Home() {
                       <input className="field" value={newPlant.infoUrl} onChange={(e) => setNewPlant((p) => ({ ...p, infoUrl: e.target.value }))} placeholder="Link (https://...)" />
                       <textarea className="field min-h-20" value={newPlant.notes} onChange={(e) => setNewPlant((p) => ({ ...p, notes: e.target.value }))} placeholder="Notiz" />
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <Field label="Aktuelles Bild"><input type="file" accept="image/*" onChange={(e) => handleNewPlantPhoto("currentPhoto", e)} className="upload" />{newPlant.currentPhoto ? <img src={newPlant.currentPhoto} alt="Neu aktuell" className="mt-2 h-16 w-16 cursor-zoom-in rounded-lg object-cover" onClick={() => setZoomImage({ src: newPlant.currentPhoto, label: "Neues aktuelles Bild" })} /> : null}</Field>
-                        <Field label="Endstadium Bild"><input type="file" accept="image/*" onChange={(e) => handleNewPlantPhoto("finalPhoto", e)} className="upload" />{newPlant.finalPhoto ? <img src={newPlant.finalPhoto} alt="Neu end" className="mt-2 h-16 w-16 cursor-zoom-in rounded-lg object-cover" onClick={() => setZoomImage({ src: newPlant.finalPhoto, label: "Neues Endstadium Bild" })} /> : null}</Field>
+                        <Field label="Aktuelles Bild"><input type="file" accept="image/*" onChange={(e) => handleNewPlantPhoto("currentPhoto", e)} className="upload" />{newPlant.currentPhoto ? <img src={newPlant.currentPhoto} alt="Neu aktuell" loading="lazy" decoding="async" className="mt-2 h-16 w-16 cursor-zoom-in rounded-lg object-cover" onClick={() => setZoomImage({ src: newPlant.currentPhoto, label: "Neues aktuelles Bild" })} /> : null}</Field>
+                        <Field label="Endstadium Bild"><input type="file" accept="image/*" onChange={(e) => handleNewPlantPhoto("finalPhoto", e)} className="upload" />{newPlant.finalPhoto ? <img src={newPlant.finalPhoto} alt="Neu end" loading="lazy" decoding="async" className="mt-2 h-16 w-16 cursor-zoom-in rounded-lg object-cover" onClick={() => setZoomImage({ src: newPlant.finalPhoto, label: "Neues Endstadium Bild" })} /> : null}</Field>
                       </div>
                       <button onClick={addPlantToHighBed} className="btn-primary">Hinzufügen</button>
                     </div>
@@ -640,8 +700,8 @@ export default function Home() {
                           <button onClick={() => removePlantFromHighBed(plant.id)} className="btn-ghost">Entfernen</button>
                         </div>
                         <div className="mt-2 flex gap-2">
-                          {plant.currentPhoto ? <img src={plant.currentPhoto} alt="Aktuell" className="h-16 w-16 cursor-zoom-in rounded-lg object-cover" onClick={() => setZoomImage({ src: plant.currentPhoto, label: `${plant.crop} · Aktuell` })} /> : null}
-                          {plant.finalPhoto ? <img src={plant.finalPhoto} alt="Endstadium" className="h-16 w-16 cursor-zoom-in rounded-lg object-cover" onClick={() => setZoomImage({ src: plant.finalPhoto, label: `${plant.crop} · Endstadium` })} /> : null}
+                          {plant.currentPhoto ? <img src={plant.currentPhoto} alt="Aktuell" loading="lazy" decoding="async" className="h-16 w-16 cursor-zoom-in rounded-lg object-cover" onClick={() => setZoomImage({ src: plant.currentPhoto, label: `${plant.crop} · Aktuell` })} /> : null}
+                          {plant.finalPhoto ? <img src={plant.finalPhoto} alt="Endstadium" loading="lazy" decoding="async" className="h-16 w-16 cursor-zoom-in rounded-lg object-cover" onClick={() => setZoomImage({ src: plant.finalPhoto, label: `${plant.crop} · Endstadium` })} /> : null}
                         </div>
                         <button onClick={() => openHighProgress(plant.id)} className="btn-ghost mt-3 w-full text-sm sm:w-auto">
                           {activeProgressPlantId === plant.id ? "Abbrechen" : "+ Zwischenstand"}
@@ -668,7 +728,7 @@ export default function Home() {
           <motion.div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setZoomImage(null)}>
             <motion.div className="max-w-5xl" initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.96, opacity: 0 }} onClick={(e) => e.stopPropagation()}>
               <p className="mb-2 text-sm font-semibold text-white">{zoomImage.label}</p>
-              <img src={zoomImage.src} alt={zoomImage.label} className="max-h-[80vh] w-auto rounded-2xl object-contain shadow-2xl" />
+              <img src={zoomImage.src} alt={zoomImage.label} decoding="async" className="max-h-[80vh] w-auto rounded-2xl object-contain shadow-2xl" />
             </motion.div>
           </motion.div>
         ) : null}
@@ -709,10 +769,10 @@ function BeetRow({
                 className="mb-2 block w-full overflow-hidden rounded-xl border border-emerald-900/10 bg-emerald-50 disabled:cursor-not-allowed"
               >
                 <div className="h-20 border-b border-emerald-900/10 bg-emerald-50">
-                  {item.currentPhoto ? <img src={item.currentPhoto} alt={`${item.crop || slotLabel(key)} aktuell`} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-xs text-zinc-400">Aktuell</div>}
+                  {item.currentPhoto ? <img src={item.currentPhoto} alt={`${item.crop || slotLabel(key)} aktuell`} loading="lazy" decoding="async" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-xs text-zinc-400">Aktuell</div>}
                 </div>
                 <div className="h-20 bg-emerald-50">
-                  {item.finalPhoto ? <img src={item.finalPhoto} alt={`${item.crop || slotLabel(key)} endstadium`} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-xs text-zinc-400">Endstadium</div>}
+                  {item.finalPhoto ? <img src={item.finalPhoto} alt={`${item.crop || slotLabel(key)} endstadium`} loading="lazy" decoding="async" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-xs text-zinc-400">Endstadium</div>}
                 </div>
               </button>
               <div className="line-clamp-1 text-base font-bold text-emerald-950">{item.crop || "Noch frei"}</div>
@@ -756,7 +816,7 @@ function ProgressComposer({
       </div>
       {draft.photo ? (
         <div className="sm:col-span-2 flex items-center gap-3 rounded-xl border border-emerald-900/10 bg-white p-2">
-          <img src={draft.photo} alt="Vorschau des Zwischenstands" className="h-16 w-16 rounded-lg object-cover" />
+          <img src={draft.photo} alt="Vorschau des Zwischenstands" loading="lazy" decoding="async" className="h-16 w-16 rounded-lg object-cover" />
           <p className="text-xs font-semibold text-emerald-800">Foto bereit zum Speichern</p>
         </div>
       ) : null}
@@ -787,7 +847,7 @@ function ProgressTimeline({
         <article key={entry.id} className="relative grid grid-cols-[16px_96px_1fr] gap-3 sm:grid-cols-[16px_128px_1fr]">
           <span className="relative z-10 mt-2 h-[15px] w-[15px] rounded-full border-[3px] border-white bg-emerald-600 shadow-sm" />
           <button type="button" onClick={() => onZoom({ src: entry.photo, label: `${label} · ${formatGardenDate(entry.date)}` })} className="overflow-hidden rounded-xl bg-emerald-100">
-            <img src={entry.photo} alt={`${label} am ${formatGardenDate(entry.date)}`} className="h-24 w-full object-cover sm:h-28" />
+            <img src={entry.photo} alt={`${label} am ${formatGardenDate(entry.date)}`} loading="lazy" decoding="async" className="h-24 w-full object-cover sm:h-28" />
           </button>
           <div className="min-w-0 py-1">
             <p className="text-sm font-extrabold text-emerald-950">{formatGardenDate(entry.date)}</p>
@@ -813,7 +873,31 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="block"><span className="mb-1 block text-xs font-bold tracking-wide text-zinc-600 uppercase">{label}</span>{children}</label>;
 }
 
-async function compressImageToDataUrl(file: File, maxSize: number, quality: number): Promise<string> {
+function countLegacyImages(mainBeds: Record<BedKey, MainBedEntry>, highBeds: Record<BedKey, HighBedEntry>) {
+  let count = 0;
+  const add = (value: string) => {
+    if (value.startsWith("data:image/")) count += 1;
+  };
+
+  mainBedKeys.forEach((key) => {
+    const entry = mainBeds[key];
+    add(entry.currentPhoto);
+    add(entry.finalPhoto);
+    entry.progress.forEach((progress) => add(progress.photo));
+  });
+  highBedKeys.forEach((key) => {
+    const entry = highBeds[key];
+    add(entry.photo);
+    entry.plants.forEach((plant) => {
+      add(plant.currentPhoto);
+      add(plant.finalPhoto);
+      plant.progress.forEach((progress) => add(progress.photo));
+    });
+  });
+  return count;
+}
+
+async function compressImageToBlob(file: File, maxSize: number, quality: number): Promise<Blob> {
   const src = await readFileAsDataUrl(file);
   const img = await loadImage(src);
   const ratio = Math.min(1, maxSize / Math.max(img.width, img.height));
@@ -824,9 +908,15 @@ async function compressImageToDataUrl(file: File, maxSize: number, quality: numb
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d");
-  if (!ctx) return src;
+  if (!ctx) throw new Error("Bild konnte nicht verarbeitet werden");
   ctx.drawImage(img, 0, 0, width, height);
-  return canvas.toDataURL("image/jpeg", quality);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("Bild konnte nicht komprimiert werden"))),
+      "image/jpeg",
+      quality,
+    );
+  });
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {

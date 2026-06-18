@@ -2,6 +2,8 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+Create a public Vercel Blob store for garden photos and connect it to this project. Vercel then provides `BLOB_READ_WRITE_TOKEN` automatically. For local development, pull or copy that value into `.env.local` together with `DATABASE_URL` and `APP_PIN_CODE`.
+
 First, run the development server:
 
 ```bash
