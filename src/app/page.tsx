@@ -357,7 +357,7 @@ export default function Home() {
       return payload.url;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Bild konnte nicht hochgeladen werden";
-      setStorageError(message.includes("BLOB_READ_WRITE_TOKEN") ? "Vercel Blob ist noch nicht mit dem Projekt verbunden." : message);
+      setStorageError(friendlyStorageError(message));
       return null;
     } finally {
       setIsUploading(false);
@@ -476,7 +476,7 @@ export default function Home() {
       window.location.reload();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Alte Bilder konnten nicht migriert werden.";
-      setStorageError(message.includes("BLOB_READ_WRITE_TOKEN") ? "Vercel Blob ist noch nicht mit dem Projekt verbunden." : message);
+      setStorageError(friendlyStorageError(message));
       setIsMigratingImages(false);
     }
   };
@@ -567,6 +567,7 @@ export default function Home() {
               <div>
                 <p className="text-sm font-extrabold text-amber-950">{legacyImageCount} ältere Bilder verlangsamen noch die App</p>
                 <p className="mt-1 text-xs text-amber-900/75">Einmalig zu Vercel Blob verschieben. Inhalte und Zuordnung bleiben erhalten.</p>
+                {storageError ? <p className="mt-2 rounded-lg bg-rose-100 px-2.5 py-2 text-xs font-bold text-rose-800">{storageError}</p> : null}
               </div>
               <button type="button" onClick={migrateLegacyImages} disabled={isMigratingImages} className="btn-primary shrink-0 disabled:opacity-50">
                 {isMigratingImages ? "Wird optimiert ..." : "Bilder jetzt optimieren"}
@@ -863,6 +864,16 @@ function ProgressTimeline({
 function formatGardenDate(value: string) {
   const [year, month, day] = value.split("-");
   return day && month && year ? `${day}.${month}.${year}` : value;
+}
+
+function friendlyStorageError(message: string) {
+  if (message.includes("BLOB_READ_WRITE_TOKEN")) {
+    return "Vercel Blob ist nicht mit diesem Projekt verbunden oder der Token fehlt in Production.";
+  }
+  if (/access|private|public/i.test(message)) {
+    return "Der verbundene Blob-Speicher hat den falschen Zugriffstyp. Bitte einen öffentlichen (Public) Blob-Store verwenden.";
+  }
+  return message;
 }
 
 function Stat({ label, value }: { label: string; value: string | number }) {
